@@ -1,42 +1,59 @@
 import React, { useRef, useCallback, useContext } from 'react';
-import { FiLogIn, FiMail } from 'react-icons/fi';
+import { FiLock } from 'react-icons/fi';
 import { Form } from '@unform/web';
 import { FormHandles } from '@unform/core';
 import * as Yup from 'yup';
 
-import { Link, useHistory } from 'react-router-dom';
+import { Link, useHistory, useLocation } from 'react-router-dom';
 import logoImg from '../../assets/logo.svg';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
 import getValidationErrors from '../../utils/getValidationError';
-import { useAuth } from '../../hooks/auth';
 import { useToast } from '../../hooks/toast';
 
 import { Container, Content, Background, AnimationContainer } from './styles';
+import api from '../../services/api';
 
-interface SignInFormData {
-  email: string;
+interface ResetPasswordFormData {
   password: string;
+  passwordConfirmation: string;
 }
 
-const SignIn: React.FunctionComponent = () => {
-  const { signIn } = useAuth();
+const ResetPassword: React.FunctionComponent = () => {
   const { addToast } = useToast();
+
+  const history = useHistory();
+
+  const location = useLocation();
+
   const formRef = useRef<FormHandles>(null);
   const handleSubmit = useCallback(
-    async (data: SignInFormData): Promise<void> => {
+    async (data: ResetPasswordFormData): Promise<void> => {
       try {
         formRef.current?.setErrors({});
         const schema = Yup.object().shape({
-          email: Yup.string()
-            .required('Email obrigatório')
-            .email('Digite um email válido'),
           password: Yup.string().required('Senha obrigatória'),
+          passwordConfirmation: Yup.string().oneOf(
+            [Yup.ref('password'), null],
+            'A senha precisa ser igual',
+          ),
         });
 
         await schema.validate(data, { abortEarly: false });
 
-        await signIn({ email: data.email, password: data.password });
+        const token = location.search.replace('?token=', '');
+
+        if (!token) {
+          throw new Error();
+        }
+
+        await api.post('/password/reset', {
+          password: data.password,
+          password_confirmation: data.passwordConfirmation,
+          token,
+        });
+
+        history.push('/signin');
       } catch (error) {
         if (error instanceof Yup.ValidationError) {
           const errors = getValidationErrors(error);
@@ -47,12 +64,12 @@ const SignIn: React.FunctionComponent = () => {
 
         addToast({
           type: 'error',
-          title: 'Erro na autenticação',
-          description: 'Ocorreu um erro ao fazer login',
+          title: 'Erro ao resetar senha',
+          description: 'Ocorreu um erro ao resetar senha',
         });
       }
     },
-    [signIn, addToast],
+    [addToast, history, location.search],
   );
 
   return (
@@ -62,31 +79,27 @@ const SignIn: React.FunctionComponent = () => {
           <img src={logoImg} alt="GoBarber" />
 
           <Form ref={formRef} onSubmit={handleSubmit}>
-            <h1>Faça seu logon</h1>
+            <h1>Resetar senha</h1>
 
             <Input
-              icon={FiMail}
-              name="email"
-              type="text"
-              placeholder="E-mail"
-            />
-            <Input
-              icon={FiMail}
+              icon={FiLock}
               name="password"
               type="password"
-              placeholder="Senha"
+              placeholder="Nova senha"
             />
-            <Button type="submit">Entrar</Button>
-            <Link to="/forgot-password">Esqueci minha senha</Link>
+
+            <Input
+              icon={FiLock}
+              name="passwordConfirmation"
+              type="password"
+              placeholder="Confirmação da senha"
+            />
+            <Button type="submit">Alterar Senha</Button>
           </Form>
-          <Link to="signup">
-            <FiLogIn />
-            Criar conta
-          </Link>
         </AnimationContainer>
       </Content>
       <Background />
     </Container>
   );
 };
-export default SignIn;
+export default ResetPassword;

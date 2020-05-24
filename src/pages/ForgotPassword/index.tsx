@@ -1,10 +1,10 @@
-import React, { useRef, useCallback, useContext } from 'react';
+import React, { useRef, useCallback, useContext, useState } from 'react';
 import { FiLogIn, FiMail } from 'react-icons/fi';
 import { Form } from '@unform/web';
 import { FormHandles } from '@unform/core';
 import * as Yup from 'yup';
 
-import { Link, useHistory } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import logoImg from '../../assets/logo.svg';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
@@ -13,6 +13,7 @@ import getValidationErrors from '../../utils/getValidationError';
 import { useToast } from '../../hooks/toast';
 
 import { Container, Content, Background, AnimationContainer } from './styles';
+import api from '../../services/api';
 
 interface ForgotPasswordFormData {
   email: string;
@@ -20,11 +21,14 @@ interface ForgotPasswordFormData {
 }
 
 const ForgotPassword: React.FunctionComponent = () => {
+  const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
   const formRef = useRef<FormHandles>(null);
   const handleSubmit = useCallback(
     async (data: ForgotPasswordFormData): Promise<void> => {
       try {
+        setLoading(true);
+
         formRef.current?.setErrors({});
         const schema = Yup.object().shape({
           email: Yup.string()
@@ -35,6 +39,15 @@ const ForgotPassword: React.FunctionComponent = () => {
         await schema.validate(data, { abortEarly: false });
 
         // recuperação de senha
+
+        await api.post('/password/forgot', { email: data.email });
+
+        addToast({
+          type: 'success',
+          title: 'E-mail de recuperação enviado',
+          description:
+            'Enviamos um e-mail para confirmar a recuperação de senha',
+        });
       } catch (error) {
         if (error instanceof Yup.ValidationError) {
           const errors = getValidationErrors(error);
@@ -49,6 +62,8 @@ const ForgotPassword: React.FunctionComponent = () => {
           description:
             'Ocorreu um erro ao tentar realizar a recuperação de senha',
         });
+      } finally {
+        setLoading(false);
       }
     },
     [addToast],
@@ -69,18 +84,13 @@ const ForgotPassword: React.FunctionComponent = () => {
               type="text"
               placeholder="E-mail"
             />
-            <Input
-              icon={FiMail}
-              name="password"
-              type="password"
-              placeholder="Senha"
-            />
-            <Button type="submit">Entrar</Button>
-            <a href="forgot">Esqueci minha senha</a>
+            <Button loading={loading} type="submit">
+              Recuperar
+            </Button>
           </Form>
-          <Link to="signup">
+          <Link to="/signin">
             <FiLogIn />
-            Criar conta
+            Voltar ao login
           </Link>
         </AnimationContainer>
       </Content>
